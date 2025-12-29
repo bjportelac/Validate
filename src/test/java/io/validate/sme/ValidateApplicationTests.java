@@ -1,10 +1,10 @@
-package io.validate.loans;
+package io.validate.sme;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class LoansApplicationTests {
+class ValidateApplicationTests {
 
 	@Test
 	void contextLoads() {

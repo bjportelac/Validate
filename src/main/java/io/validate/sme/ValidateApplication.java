@@ -1,13 +1,13 @@
-package io.validate.loans;
+package io.validate.sme;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class LoansApplication {
+public class ValidateApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(LoansApplication.class, args);
+		SpringApplication.run(ValidateApplication.class, args);
 	}
 
 }

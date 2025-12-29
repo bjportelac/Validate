@@ -29,7 +29,7 @@ extra["springCloudVersion"] = "2025.1.0"
 dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-couchbase")
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
-	implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
+	implementation("com.google.genai:google-genai:1.32.0")
 	compileOnly("org.projectlombok:lombok")
 	developmentOnly("org.springframework.boot:spring-boot-devtools")
 	annotationProcessor("org.projectlombok:lombok")
