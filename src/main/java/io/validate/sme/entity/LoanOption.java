@@ -17,4 +17,16 @@ public record LoanOption(
         double monthlyPayment,
         double interestRate,
         String interestRateType) {
+
+    @Override
+    public String toString() {
+        return "LoanOption: {" +
+                "financialInstitutionType='" + financialInstitutionType + '\'' +
+                ", offeredLoanValue=" + offeredLoanValue +
+                ", paymentTerm=" + paymentTerm +
+                ", monthlyPayment=" + monthlyPayment +
+                ", interestRate=" + interestRate +
+                ", interestRateType='" + interestRateType + '\'' +
+                '}';
+    }
 }

@@ -24,4 +24,44 @@ public class FinancialData implements Serializable {
     private Flow flow;
 
     private List<LoanOption> loanOptions;
+
+    public String getCompanyName() {
+        return companyName;
+    }
+
+    public String getCompanyMainActivity() {
+        return companyMainActivity;
+    }
+
+    public int getOperationalTime() {
+        return operationalTime;
+    }
+
+    public int getEmployeeAmount() {
+        return employeeAmount;
+    }
+
+    public Assets getAssets() {
+        return assets;
+    }
+
+    public Income getIncome() {
+        return income;
+    }
+
+    public Expenses getExpenses() {
+        return expenses;
+    }
+
+    public Liabilities getLiabilities() {
+        return liabilities;
+    }
+
+    public Flow getFlow() {
+        return flow;
+    }
+
+    public List<LoanOption> getLoanOptions() {
+        return loanOptions;
+    }
 }

@@ -14,4 +14,28 @@ public class AnalysisResult {
     private Map<String, Double> indicators;
     private String message;
     private LoanOption option;
+
+    public Map<String, Double> getIndicators() {
+        return indicators;
+    }
+
+    public void setIndicators(Map<String, Double> indicators) {
+        this.indicators = indicators;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    public LoanOption getOption() {
+        return option;
+    }
+
+    public void setOption(LoanOption option) {
+        this.option = option;
+    }
 }
