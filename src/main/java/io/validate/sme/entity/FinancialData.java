@@ -21,7 +21,6 @@ public class FinancialData implements Serializable {
     private Income income;
     private Expenses expenses;
     private Liabilities liabilities;
-    private Flow flow;
 
     private List<LoanOption> loanOptions;
 
@@ -55,10 +54,6 @@ public class FinancialData implements Serializable {
 
     public Liabilities getLiabilities() {
         return liabilities;
-    }
-
-    public Flow getFlow() {
-        return flow;
     }
 
     public List<LoanOption> getLoanOptions() {

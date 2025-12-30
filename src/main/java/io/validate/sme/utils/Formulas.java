@@ -17,7 +17,7 @@ public final class Formulas {
     }
 
     public static Double getPaymentCapacity(Income income, Expenses expenses, Liabilities liabilities){
-        return income.averageIncome() - (expenses.fixedExpenses() + expenses.varyingExpenses() + liabilities.debtAmount());
+        return income.averageIncome() - (expenses.fixedExpenses() + expenses.varyingExpenses() + liabilities.monthlyPayments());
     }
 
     public static Double getDebtRatio(Liabilities liabilities, Double equities) {

@@ -2,17 +2,16 @@ package io.validate.sme.service;
 
 import com.google.genai.Client;
 import com.google.genai.types.GenerateContentResponse;
-import io.validate.sme.entity.AnalysisResult;
-import io.validate.sme.entity.FinancialData;
-import io.validate.sme.entity.LoanOption;
-import io.validate.sme.entity.Report;
+import io.validate.sme.entity.*;
 import io.validate.sme.repositories.EvaluationRepository;
 import io.validate.sme.utils.Formulas;
+import io.validate.sme.utils.Sorter;
 import jakarta.annotation.Nonnull;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.*;
 
@@ -20,12 +19,13 @@ import java.util.*;
 public class EvaluationServiceImpl implements EvaluationService{
 
     private static final Logger LOGGER = LoggerFactory.getLogger(EvaluationServiceImpl.class);
+    private static final ObjectMapper MAPPER =  new ObjectMapper();
 
     private static final String EQUITIES = "PATRIMONIO";
-    private static final String DEBT_CAPACITY = "CAPACIDAD_DE_ENDUDAMIENTO";
+    private static final String DEBT_CAPACITY = "CAPACIDAD_DE_ENDEUDAMIENTO";
     private static final String DEBT_RATIO = "RAZON_DE_ENDEUDAMIENTO";
     private static final String OPERATING_PROFIT = "UTILIDAD_OPERATIVA";
-    private static final String PAYMENT_CAPACITY = "CAPACIDAD_DE_PAGO";
+    private static final String OPERATING_MARGIN = "MARGEN_OPERATIVO";
 
     private final EvaluationRepository repository;
 
@@ -64,88 +64,103 @@ public class EvaluationServiceImpl implements EvaluationService{
     private AnalysisResult performEvaluation(@Nonnull FinancialData data) {
 
         AnalysisResult result = new AnalysisResult();
-        StringBuilder builder =  new StringBuilder();
-
-        Double debtCapacity = Formulas.getPaymentCapacity(data.getIncome(), data.getExpenses(), data.getLiabilities());
         Double equities = Formulas.getEquities(data.getAssets(), data.getLiabilities());
-        double debtRatio = Formulas.getDebtRatio(data.getLiabilities(), equities);
         Double operatingProfit = Formulas.getOperatingProfit(data.getIncome(), data.getExpenses());
-        Double paymentCapacity = Formulas.getPaymentCapacity(data.getIncome(), data.getExpenses(), data.getLiabilities());
 
         Map<String,Double> numericalResults = Map.of(
-                EQUITIES, equities,
-                DEBT_CAPACITY, debtCapacity,
-                DEBT_RATIO, debtRatio,
+                EQUITIES,  Formulas.getEquities(data.getAssets(), data.getLiabilities()),
+                DEBT_CAPACITY, Formulas.getPaymentCapacity(data.getIncome(), data.getExpenses(), data.getLiabilities()),
+                DEBT_RATIO, Formulas.getDebtRatio(data.getLiabilities(), equities),
                 OPERATING_PROFIT, operatingProfit,
-                PAYMENT_CAPACITY, paymentCapacity
+                OPERATING_MARGIN, Formulas.operatingMargin(operatingProfit,data.getIncome())
         );
 
+        AIDecision decision = MAPPER.readValue(computeMessage(numericalResults, data), AIDecision.class);
+        List<LoanOption> ranking = null;
+
+        if(decision.id() == 0){
+            ranking = Sorter.sortByRanking(data.getLoanOptions(), decision.ranking());
+            result.setOption(ranking.removeFirst());
+        } else {
+            ranking = data.getLoanOptions();
+            var selectedOption = ranking.remove(decision.id() - 1);
+            result.setOption(selectedOption);
+        }
+
         result.setIndicators(numericalResults);
-
-        if (debtRatio < 0.3) {
-            builder.append("La razon de endeudamiento equivale a %.2f, solicitar un prestamo es viable.\n".formatted(debtCapacity));
-        } else if (debtRatio >= 0.3 && debtRatio < 0.6) {
-            builder.append("La razon de endeudamiento equivale a %.2f, solicitar un prestamo es viable pero se debe actuar con moderacion, se evaluaran las opciones.\n".formatted(debtCapacity));
-        } else {
-            builder.append("La razon de endeudamiento es superior a 0.6, NO es recomendable solicitar un préstamo en el momento.\n");
-        }
-
-        if (operatingProfit <= 0.09) {
-            builder.append("El margen de ganacias ( %.2f ) no es suficiente para solicitar un préstamo;\n".formatted(operatingProfit));
-        } else if (operatingProfit >= 0.1 && operatingProfit <=0.14) {
-            builder.append("El margen de ganacias ( %.2f ) es aceptable, solicitar un prestamo es viable con estas ganancias pero se debe actuar con moderacion.\n".formatted(operatingProfit));
-        } else if (operatingProfit >= 0.15 && operatingProfit <= 0.19) {
-            builder.append("El margen de ganacias ( %.2f ) es bueno, solicitar un prestamo es viable con estas ganancias.\n".formatted(operatingProfit));
-        } else {
-            builder.append("El margen de ganacias ( %.2f ) es excelente, solicitar un prestamo es recomendable con estas ganancias.\n".formatted(operatingProfit));
-        }
-
-        List<LoanOption> options = new ArrayList<>();
-        for (LoanOption option : data.getLoanOptions()) {
-            //Discard by coverage ratio
-            var coverageRatio = Formulas.getDebtCoverageRatio(paymentCapacity, option.monthlyPayment());
-            if (coverageRatio < 1) {
-                continue;
-            }
-
-            if (paymentCapacity - option.monthlyPayment() <= 0.0) {
-                continue;
-            }
-
-            options.add(option);
-        }
-
-        if(options.isEmpty()) {
-            builder.append("No hay una opcion disponible para el prestamo entre las opciones que el cliente ha dado. Por favor validar los indicadores numericos para encontrar una opcion");
-            result.setOption(null);
-            result.setMessage(builder.toString());
-
-            return result;
-        }
-
-        Optional<LoanOption> bestOption = options.stream().max(Comparator.comparingDouble(LoanOption::offeredLoanValue));
-        bestOption.ifPresent(result::setOption);
-
-        result.setMessage(computeMessage(builder.toString(), result.getOption()));
+        result.setMessage(decision.reason());
+        result.setRanking(ranking);
 
         return result;
     }
 
-    private String computeMessage(String context, LoanOption option) {
+    private String computeMessage(Map<String, Double> indicators, FinancialData data) {
         try (Client client = Client.builder().apiKey("").build()) {
             String message = """
-                    Hola, basado en los siguientes indicadores: %s \n
-                    y la siguiente opcion de prestamo: %s \n
-                    genera un mensaje de decision para el usuario, que sea corto y conciso.
-                    """.formatted(context, option.toString());
+                You are a financial decision engine.
+                
+                Your task is to evaluate loan options using ALL provided financial information and select the best option, or none.
+                
+                STRICT RULES (MANDATORY):
+                - Perform all reasoning internally.
+                - DO NOT reveal analysis, calculations, assumptions, or intermediate steps.
+                - DO NOT restate, summarize, or explain the input data.
+                - DO NOT include headings, lists, markdown, or code blocks.
+                - DO NOT include any text outside the required output format.
+                - The "reason" field MUST be written in Spanish.
+                - Any deviation from the output format is an error.
+                
+                INPUT INTERPRETATION RULES (MANDATORY):
+                - financial data contains pre-calculated financial indicators and MUST be considered.
+                - assets, income, liabilities and expenses provide additional context and MUST influence the decision.
+                - the monthlyPayments in liabilities SHOULD be considered to rule out an option.
+                - averageIncome indicate monthly income .
+                - fixedExpenses and varyingExpenses represent the expenses per month.
+                - PAYMENT_CAPACITY indicate remaining liquidity per month.
+                - assetsValue supports debt capacity but does NOT override payment sustainability.
+                
+                DECISION RULES:
+                - Monthly payment must be sustainable considering:
+                  PAYMENT_CAPACITY, monthlyPayments from liabilities and the quota per loan option.
+                - The paymentTerm represents the amount of monthly payment the user will do.
+                - Prefer lower effective cost of credit.
+                - Loan amount must be coherent with income, assets, and remaining liquidity.
+                
+                OUTPUT FORMAT (EXACT, NO EXTRA TEXT):
+                {
+                  "id": <integer between 1 and n>,
+                  "reason": "<max 5 sentences>",
+                  "ranking": [<list of option ids ordered from best to worst>]
+                }
+                
+                If NO option is financially viable or responsible, return:
+                {
+                  "id": 0,
+                  "reason": "<max 5 sentences>",
+                  "ranking": [<list of option ids ordered from best to worst>]
+                }
+                
+                INPUT:
+                - indicators: %s
+                - loanOptions: %s
+                - assets: %s
+                - income: %s
+                - liabilities: %s
+                - expenses: %s
+                """.formatted(
+                    indicators.toString(),
+                    data.getLoanOptions().toString(),
+                    data.getAssets().toString(),
+                    data.getIncome().toString(),
+                    data.getLiabilities().toString(),
+                    data.getExpenses().toString()
+            );
+
 
             GenerateContentResponse response = client.models.generateContent("gemini-2.5-flash-lite", message, null);
+            LOGGER.info("Completed AI prompt and response.");
 
-            if(!Objects.requireNonNull(response.text()).isEmpty()){
-                return response.text();
-            } else {
-                return "Basado en los indicadores: %s\n la opcion seleccionada es: %s".formatted(context, option.toString());
-            }
+            return response.text();
         }
     }
 

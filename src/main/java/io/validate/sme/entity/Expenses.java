@@ -7,4 +7,9 @@ package io.validate.sme.entity;
  * @param varyingExpenses the varying expenses amount
  */
 public record Expenses(double fixedExpenses, double varyingExpenses) {
+
+    @Override
+    public String toString() {
+        return "Expenses: { fixedExpenses=" + fixedExpenses + ", varyingExpenses=" + varyingExpenses + '}';
+    }
 }
