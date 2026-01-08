@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/validate/api/v1")
+@CrossOrigin(origins = "*")
 public class EvaluationController {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(EvaluationController.class);
